@@ -1,0 +1,1006 @@
+openapi: 3.0.3
+info:
+  title: User Microservice API
+  description: >
+    The User Microservice allows users to perform different operations on their accounts, while specifying 
+    their own user_id in a header named 'user_id' where needed. The root address of this API is '/user'.
+    
+    
+    Certain operations are only executable by users which hold a certain role, for instance, the '/admin' paths are
+    only executable by users which obtained the 'Admin' role. 
+    The role hierarchy is (Regular) User < Author < Admin when comparing 
+    by permissions. Regular users and authors are not able to view other users' credentials, in fact, they are 
+    only allowed to view other users' profiles (which do not contain sensitive attributes). Nobody is allowed to view 
+    their own nor other users' passwords through the endpoints, modification of one's password is possible.
+    
+    
+    Admins are users too in our application.
+
+  version: 1.0.0
+servers:
+  - url: http://localhost:8080/user
+tags:
+  - name: User
+    description: Everything related to the user credentials
+  - name: UserProfile
+    description: Everything related to users' profiles
+  - name: Author
+    description: Everything related to authors
+  - name: Admin
+    description: Everything related to admins
+components:
+  parameters:
+    UserIDHeader: # try using this when a header is specified with the user email
+      name: user_id
+      in: header
+      description: Your User ID
+      required: true
+      schema:
+        type: string
+        format: uuid
+  schemas:
+    User:
+      required:
+        - email
+        - password
+      type: object
+      x-class-extra-annotation : "@javax.persistence.Entity" # share JPA entity name
+      x-implements: ['nl.tudelft.sem.template.user.models.UserInterface']
+      properties:
+        user_id:
+          description: the ID of the user
+          type: string
+          format: uuid
+          x-field-extra-annotation: "@javax.persistence.Id"
+        email:
+          description: email of user
+          type: string
+          format: email
+          pattern: "\\w+@\\w+\\.\\w{2,}"
+        password:
+          type: string
+          format: password
+#        profile:
+#          $ref: "#/components/schemas/UserProfile"
+#          type: object
+#          format: UserProfile
+#          x-field-extra-annotation: "@javax.persistence.OneToOne"
+
+
+
+    UserWithoutPassword:
+      required:
+        - email
+      type: object
+      properties:
+        user_id:
+          description: the ID of the user
+          type: string
+          format: uuid
+        email:
+          description: email of user
+          type: string
+          format: email
+          pattern: "\\w+@\\w+\\.\\w{2,}"
+#        profile:
+#          $ref: "#/components/schemas/UserProfile"
+
+    UserAuth:
+      required:
+        - username
+        - email
+        - password
+      type: object
+      properties:
+        username:
+          type: string
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+
+    UserProfile:
+      required:
+        - username
+      type: object
+      x-class-extra-annotation : "@javax.persistence.Entity"
+      properties:
+        # needed for usage as follower/following and finding user profile by user id (to prevent
+        # other users from seeing your email/password)
+        user_id:
+          description: the ID of the user
+          type: string
+          format: uuid
+          x-field-extra-annotation: "@javax.persistence.Id @javax.persistence.GeneratedValue"
+
+#          x-annotations:
+#            - "@javax.persistence.Id"
+#            - "@GeneratedValue(generator = \"uuid2\")"
+#            - "@GenericGenerator(name = \"uuid2\", strategy = \"org.hibernate.id.UUIDGenerator\")"
+#            - "@Column(name = \"userId\", columnDefinition = \"VARCHAR(255)\")"
+        username:
+          type: string
+          pattern: "^\\w{2,20}$"
+#        email:
+#          type: string
+#          format: email
+        name:
+          type: string
+        privacy:
+          type: integer
+          enum:
+            - 0
+            - 1
+          x-enum-varnames:
+            - PUBLIC
+            - PRIVATE
+          description: >
+            Privacy ID:
+             * `0` - Public Profile
+             * `1` - Private Profile
+        role:
+          type: integer
+          enum:
+            - 0
+            - 1
+            - 2
+          x-enum-varnames:
+            - USER
+            - AUTHOR
+            - ADMIN
+          description: >
+            Role ID:
+             * `0` - User Role
+             * `1` - Author Role
+             * `2` - Admin Role
+        state:
+          type: integer
+          enum:
+            - 0
+            - 1
+            - 2
+          x-enum-varnames:
+            - ACTIVE
+            - INACTIVE
+            - BANNED
+          default: 0  # Set the default value to ACTIVE
+          description: >
+            State ID:
+             * `0` - Active
+             * `1` - Inactive
+             * `2` - Banned
+        bio:
+          type: string
+        avatar:
+          description: The profile picture
+          type: string
+        location:
+          type: string
+        favoriteGenres:
+          description: array of ids of favorite genres
+          type: array
+          x-field-extra-annotation: "@javax.persistence.ElementCollection"
+          items:
+            type: string
+        favoriteBook:
+          description: id of favorite book
+          type: string
+
+        # for followers and following, what if 2 users follow each other
+        # let's say user1 and user2, what if we look at the profile of user1, this will
+        # show user2 in the following/followers list, then user2 will show user1 in the following/followers list
+        # and so on... doesn't this implementation create infinite loops?
+        # maybe we can just store the user id's, but that's just problems for the code itself
+        # we can leave this object as it is right now, since it doesn't matter for the OpenAPI stuff
+        followers:
+          type: array
+          description: UserProfiles of followers
+          x-field-extra-annotation: "@javax.persistence.ElementCollection"
+          items:
+            description: the ID of the profile
+            type: string
+            format: uuid
+        following:
+          type: array
+          description: UserProfiles of the "followed"
+          x-field-extra-annotation: "@javax.persistence.ElementCollection"
+          items:
+            description: the ID of the profile
+            type: string
+            format: uuid
+        friends:
+          type: array
+          description: UserProfiles of friends, friends = users who follow each other back
+          x-field-extra-annotation: "@javax.persistence.ElementCollection"
+          items:
+            description: the ID of the profile
+            type: string
+            format: uuid
+        bookshelves:
+          description: array of id's of the bookshelves
+          type: array
+          x-field-extra-annotation: "@javax.persistence.ElementCollection"
+          items:
+            type: string
+            format: UUID
+
+    UserAnalytics:  # only used in /admin/analytics
+      type: object
+      description: User data regarding system analytics
+      properties:
+        user-count:
+          type: integer
+          example: 58
+        active-users:
+          type: integer
+          example: 52
+        author-count:
+          type: integer
+          example: 12
+        most-followed-users:
+          description: top 3 followed users by id's
+          type: array
+          items:
+            type: string
+          example:
+            - user4@email.com
+            - tudelft@tudelft.nl
+            - email@user.py
+        user-log: # the printed user log may contain the last 'x' useful user operations, for now x = 10
+          description: last 'x' user activities, x can be chosen accordingly.
+          type: array
+          items:
+            type: string
+          example:
+            - user1 deactivated their account
+            - user42 got banned by admin388
+            - user21 became an author
+        most-popular-book:
+          description: id of most popular book
+          type: string
+        most-popular-genres:  # top 3 popular genres
+          description: array of id's of top 3 favorite genres
+          type: array
+          items:
+            type: string
+paths:
+  /account/create:
+    post:
+      tags:
+        - User
+      summary: Create a new user.
+      description: Create a user account using your username, (unique) email address and password.
+      operationId: createAccount
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserAuth'
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+          description: Created
+        '400':
+          description: Bad Request
+        '403':
+          description: Email is already in use
+
+
+  /account/view:
+    get:
+      tags:
+        - User
+      summary: View your account details, excluding your password.
+      description: View the details of your own account.
+      operationId: viewAccount
+      parameters:
+        - $ref: '#/components/parameters/UserIDHeader'
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserWithoutPassword'
+        '400':
+          description: Bad Request
+        '405':
+          description: Invalid input
+  /account/modify:
+    put:
+      tags:
+        - User
+      summary: Update your account details.
+      description: Update the details of your own account.
+      operationId: updateAccount
+      parameters:
+        - $ref: '#/components/parameters/UserIDHeader'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/User'
+              # do we need the normal user here, since we can also update the password?
+      responses:
+        '200':
+          description: Updated User Account
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserWithoutPassword'
+        '400':
+          description: Bad Request
+        '405':
+          description: Invalid input
+
+  /account/delete:
+    delete:
+      tags:
+        - User
+      summary: Delete your User Account.
+      description: Delete your own account.
+      operationId: deleteAccount
+      parameters:
+        - $ref: '#/components/parameters/UserIDHeader'
+      responses:
+        '200':
+          description: Deleted User
+        '400':
+          description: Bad Request
+        '405':
+          description: Invalid input
+
+  /profile/view:
+    get:
+      tags:
+        - UserProfile
+      summary: Get your own profile.
+      description: Get the UserProfile of current user.
+      operationId: getOwnProfile
+      parameters:
+        - $ref: '#/components/parameters/UserIDHeader'
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+        '401':
+          description: Unauthorized, invalid/missing ID in Header
+
+  /profile/modify:
+    put:
+      tags:
+        - UserProfile
+      summary: Update your own profile.
+      description: Update the UserProfile of the current user.
+      operationId: updateOwnProfile
+      parameters:
+        - $ref: '#/components/parameters/UserIDHeader'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserProfile'
+      responses:
+        '200':
+          description: Successful operation
+        '400':
+          description: Bad Request
+        '401':
+          description: Unauthorized, invalid/missing ID in Header
+        '405':
+          description: Invalid Input
+
+  /profile/view/{user_id}:
+    get:
+      tags:
+        - UserProfile
+      summary: View the profile of a user.
+      description: View the UserProfile of a user specified by user_id, if viewable.
+      operationId: viewProfile
+      parameters:
+        - name: user_id
+          in: path
+          description: User ID of profile to view
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+        '400':
+          description: Invalid ID supplied
+        '404':
+          description: User Profile not found
+        '401':
+          description: Unauthorized operation
+
+  /profile/all:
+    get:
+      tags:
+        - UserProfile
+      summary: View all user profiles.
+      description: View all (viewable) UserProfile's in the system.
+      operationId: viewAllProfiles
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/UserProfile'
+          description: Successful operation
+        '400':
+          description: Bad Request
+
+  /profile/find:
+    post:
+      tags:
+        - UserProfile
+      summary: Get all user profiles that meet criteria.
+      description: Get all the user profiles that meet the criteria in the request body, like name, interests etc.
+      operationId: findProfiles
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserProfile'
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/UserProfile'
+        '400':
+          description: Bad request
+        '404':
+          description: Users not found
+
+  /profile/deactivate:
+    put:
+      tags:
+        - UserProfile
+      summary: Deactivate your account.
+      description: Toggle your account status to inactive.
+      operationId: deactivateAccount
+      parameters:
+        - $ref: '#/components/parameters/UserIDHeader'
+      responses:
+        '200':
+          description: Successfully Deactivated
+        '400':
+          description: Bad Request
+        '405':
+          description: Invalid input
+
+  /profile/activate:
+    put:
+      tags:
+        - UserProfile
+      summary: Activate your account.
+      description: Toggle your account status to active.
+      operationId: activateAccount
+      parameters:
+        - $ref: '#/components/parameters/UserIDHeader'
+      responses:
+        '200':
+          description: Successfully Activated
+        '400':
+          description: Bad Request
+        '401':
+          description: User is prohibited
+        '405':
+          description: Invalid input
+
+  /profile/proveAuthor:
+    post:
+      tags:
+        - UserProfile
+      summary: Prove you're an author with an author keyphrase.
+      description: Provide a string which contains the word "author" (case insensitive) to prove author identity.
+      operationId: proveAuthor
+      parameters:
+        - $ref: '#/components/parameters/UserIDHeader'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: string
+              example: I am an author
+
+      responses:
+        '200':
+          description: Successfully Activated
+        '400':
+          description: Bad Request
+        '401':
+          description: Author credentials invalid or User prohibited
+        '405':
+          description: Invalid input
+
+  /profile/proveAdmin:
+    post:
+      tags:
+        - UserProfile
+      summary: Prove you're an admin with an admin key.
+      description: Prove you're an admin using an admin key, which has been generated by another admin.
+      operationId: proveAdmin
+      parameters:
+        - $ref: '#/components/parameters/UserIDHeader'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: string
+              format: uuid
+      responses:
+        '200':
+          description: Successfully Proved Admin
+        '400':
+          description: Bad Request
+        '401':
+          description: Admin Password Invalid or User prohibited
+        '405':
+          description: Invalid Input
+
+  /author/all:
+    get:
+      tags:
+        - Author
+      summary: Find all authors.
+      description: Returns all the authors in the database as UserProfile's.
+      operationId: getAuthors
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/UserProfile'
+        '400':
+          description: Bad Request
+
+  /author/view/{author_id}:
+    get:
+      tags:
+        - Author
+      summary: Find author by ID.
+      description: Returns an author corresponding to the given ID.
+      operationId: getAuthorByID
+      parameters:
+        - name: author_id
+          in: path
+          description: ID of author to find
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: successfully found
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/UserProfile'
+        '400':
+          description: Invalid ID supplied
+        '404':
+          description: Author not found
+
+  /admin/view/{user_id_other}:
+    get:
+      operationId: adminViewUser
+      tags:
+        - Admin
+      summary: View User as Admin.
+      description: View a user's profile as Admin, specified by user_id.
+      parameters:
+        - $ref: '#/components/parameters/UserIDHeader'
+        - name: user_id_other
+          in: path
+          description: ID of user
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+        '400':
+          description: Invalid user_id value
+        '401':
+          description: User is not an admin
+        '405':
+          description: Invalid input
+
+  /admin/modify/{user_id_other}:
+    put:
+      operationId: adminModifyUser
+      tags:
+        - Admin
+      summary: Edit User as Admin.
+      description: Edit a user's profile as Admin, specified by user_id.
+      parameters:
+        - $ref: '#/components/parameters/UserIDHeader'
+        - name: user_id_other
+          in: path
+          description: ID of user
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserProfile'
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+        '400':
+          description: Invalid user_id value
+        '401':
+          description: User is not an admin
+        '405':
+          description: Invalid input
+
+  /admin/delete/{user_id_other}:
+    delete:
+      operationId: adminDeleteUser
+      tags:
+        - Admin
+      summary: Delete User as Admin.
+      description: Delete a user as Admin, specified by user_id.
+      parameters:
+        - $ref: '#/components/parameters/UserIDHeader'
+        - name: user_id_other
+          in: path
+          description: ID of user
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Successful operation
+        '400':
+          description: Invalid user_id value
+        '401':
+          description: User is not an admin
+        '405':
+          description: Invalid input
+
+  /admin/activate/{user_to_activate}:
+    put:
+      operationId: activateUser
+      tags:
+        - Admin
+      summary: Activate or unban a user.
+      description: Activate a user as admin, which in addition represents the 'unban' action in our application too.
+      parameters:
+        - $ref: '#/components/parameters/UserIDHeader'
+        - name: user_to_activate
+          in: path
+          description: ID of user
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+        '400':
+          description: Invalid user_id value
+        '401':
+          description: User is not an admin
+        '405':
+          description: Invalid input
+
+  /admin/deactivate/{user_to_deactivate}:
+    put:
+      operationId: deactivateUser
+      tags:
+        - Admin
+      summary: Deactivate a user.
+      description: Deactivate a user as admin.
+      parameters:
+        - $ref: '#/components/parameters/UserIDHeader'
+        - name: user_to_deactivate
+          in: path
+          description: ID of user
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+        '400':
+          description: Invalid user_id value
+        '401':
+          description: User is not an admin
+        '405':
+          description: Invalid input
+
+  /admin/ban/{user_to_ban}:
+    put:
+      operationId: banUser
+      tags:
+        - Admin
+      summary: Ban a user.
+      description: Ban a user as admin.
+      parameters:
+        - $ref: '#/components/parameters/UserIDHeader'
+        - name: user_to_ban
+          in: path
+          description: ID of user
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+        '400':
+          description: Invalid user_id value
+        '401':
+          description: User is not an admin
+        '405':
+          description: Invalid input
+
+  /admin/generateAdminKey:
+    get:
+      operationId: generateAdminKey
+      tags:
+        - Admin
+      summary: Generate a new admin key.
+      description: Invoke an admin key generation as admin, the key generation happens in the business logic of the system. This new key is usable *once* in /account/proveAdmin, to prove admin identities.
+      parameters:
+        - $ref: '#/components/parameters/UserIDHeader'
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: string
+                format: uuid
+        '401':
+          description: User is not an admin
+
+  /admin/viewAdminKeys:
+    get:
+      operationId: viewAdminKeys
+      tags:
+        - Admin
+      summary: View all unused admin keys in the system
+      description: View all admin keys which have not been used already.
+      parameters:
+        - $ref: '#/components/parameters/UserIDHeader'
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+                  format: uuid
+        '401':
+          description: User is not an admin
+
+  /admin/analytics:
+    get:
+      operationId: viewAnalytics
+      tags:
+        - Admin
+      summary: Retrieve analytics on users.
+      description: Return the UserAnalytics object, filled with the correct data. This data is determined by the system only and cannot be tampered with.
+      parameters:
+        - $ref: '#/components/parameters/UserIDHeader'
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserAnalytics'
+        '401':
+          description: User is not an admin
+
+  /profile/follow/{user_id_other}:
+    put:
+      operationId: followUser
+      tags:
+        - UserProfile
+      summary: Follow a user.
+      description: Follow another user, specified by user_id.
+      parameters:
+        - $ref: '#/components/parameters/UserIDHeader'
+        - name: user_id_other
+          in: path
+          description: User ID of user to follow
+          required: true
+          schema:
+            type: string
+            format: uuid
+
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+        '400':
+          description: Invalid ID supplied
+        '404':
+          description: User not found
+        '401':
+          description: Unauthorized operation
+  /profile/unfollow/{user_id_other}:
+    delete:
+      operationId: unfollowUser
+      tags:
+        - UserProfile
+      summary: Unfollow a user.
+      description: Unfollow another user, specified by user_id.
+      parameters:
+        - $ref: '#/components/parameters/UserIDHeader'
+        - name: user_id_other
+          in: path
+          description: User ID of user to unfollow
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+        '400':
+          description: Invalid ID supplied
+        '404':
+          description: User not found
+        '401':
+          description: Unauthorized operation
+  /profile/favoriteBook/{book_id}:
+    put:
+      operationId: favoriteBook
+      tags:
+        - UserProfile
+      summary: Add book to favorites.
+      description: Add your favorite book, specified by book_id, as a user, possibly replacing the previous entry.
+      parameters:
+        - $ref: '#/components/parameters/UserIDHeader'
+        - name: book_id
+          in: path
+          description: Book ID of book selected as favorite.
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful operation
+        '400':
+          description: Invalid ID supplied
+        '404':
+          description: Book not found
+        '401':
+          description: Unauthorized operation
+  /profile/unfavoriteBook/{book_id}:
+    delete:
+      operationId: unfavoriteBook
+      tags:
+        - UserProfile
+      summary: Delete book from favourites.
+      description: Delete your favorite book as a user, specified by book_id.
+      parameters:
+        - $ref: '#/components/parameters/UserIDHeader'
+        - name: book_id
+          in: path
+          description: Book ID of book selected to delete as a favorite.
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful operation
+        '400':
+          description: Invalid ID supplied
+        '404':
+          description: Book not found
+        '401':
+          description: Unauthorized operation
+  /profile/favoriteGenre/{genre_id}:
+    put:
+      operationId: favoriteGenre
+      tags:
+        - UserProfile
+      summary: Add genre to favourites.
+      description: Add your favorite genre as a user, specified by genre_id.
+      parameters:
+        - $ref: '#/components/parameters/UserIDHeader'
+        - name: genre_id
+          in: path
+          description: Genre ID of genre selected as favorite.
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful operation
+        '400':
+          description: Invalid ID supplied
+        '404':
+          description: Genre not found
+        '401':
+          description: Unauthorized operation
+  /profile/unfavoriteGenre/{genre_id}:
+    delete:
+      operationId: unfavoriteGenre
+      tags:
+        - UserProfile
+      summary: Delete genre from favourites.
+      description: Delete one of your favorite genres as a user, specified by genre_id.
+      parameters:
+        - $ref: '#/components/parameters/UserIDHeader'
+        - name: genre_id
+          in: path
+          description: Genre ID of genre selected to delete as a favorite.
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful operation
+        '400':
+          description: Invalid ID supplied
+        '404':
+          description: Genre not found
+        '401':
+          description: Unauthorized operation
