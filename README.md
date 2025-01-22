@@ -1,27 +1,105 @@
-# Lab Template
+# BookMania User Microservice
 
-This template contains two (2) microservices:
-- authentication-microservice
-- example-microservice
+This repository contains the **User Microservice**, developed as part of the **Software Engineering Methods** course at TU Delft. The User Microservice provides user management functionalities and integrates with other microservices to create a collaborative BookMania system.
 
-The `authentication-microservice` is responsible for registering new users and authenticating current ones. After successful authentication, this microservice will provide a JWT token which can be used to bypass the security on the `example-microservice`. This token contains the *NetID* of the user that authenticated. If your scenario includes different roles, these will have to be added to the authentication-microservice and to the JWT token. To do this, you will have to:
-- Add a concept of roles to the `AppUser`
-- Add the roles to the `UserDetails` in `JwtUserDetailsService`
-- Add the roles as claims to the JWT token in `JwtTokenGenerator`
+## Features
 
-The `example-microservice` is just an example and needs to be modified to suit the domain you are modeling based on your scenario.
+- **User Management**:
+  - Create, update, deactivate, and delete user accounts.
+  - Manage user profiles with attributes such as bio, location, favorite genres, and favorite books.
+  - Role-based access control (User, Author, Admin).
 
-The `domain` and `application` packages contain the code for the domain layer and application layer. The code for the framework layer is the root package as *Spring* has some limitations on were certain files are located in terms of autowiring.
+- **Integration with Other Microservices**:
+  - Interaction with the Bookshelf microservice for favorite books and genres.
+  - Support for analytics and logs tracking user activity.
 
-## Running the microservices
+- **Security**:
+  - Proxy design pattern to protect sensitive data, such as user passwords.
+  - Compliance with privacy regulations for account and data management.
 
-You can run the two microservices individually by starting the Spring applications. Then, you can use *Postman* to perform the different requests:
+- **Scalability**:
+  - Chain of Responsibility design pattern for modular analytics processing.
+  - Extensible architecture enabling easy integration of additional features.
 
-Register:
-![image](instructions/register.png)
+## Running the Microservice
 
-Authenticate:
-![image](instructions/authenticate.png)
+You can run the microservice locally or deploy it using Docker. Follow the steps below to set up the environment:
 
-Hello:
-![image](instructions/hello.png)
+### Prerequisites
+
+- Java 15
+- Gradle
+- Spring Boot
+- Docker (optional, for containerized deployment)
+
+### Local Setup
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/your-username/bookmania-user-microservice.git
+   cd bookmania-user-microservice
+   ```
+
+2. Build the project:
+   ```bash
+   ./gradlew build
+   ```
+
+3. Run the application:
+   ```bash
+   ./gradlew bootRun
+   ```
+
+4. Access the API documentation:
+   Open the `openapi.yaml` file for a comprehensive list of endpoints.
+
+## API Endpoints
+
+The User Microservice API allows users to perform account and profile management operations. Key endpoints include:
+
+- **Account Management**:
+  - `POST /account/create`: Create a new user account.
+  - `PUT /account/modify`: Update account details.
+  - `DELETE /account/delete`: Delete user accounts.
+
+- **Profile Management**:
+  - `GET /profile/view`: View a user's profile.
+  - `PUT /profile/modify`: Update profile details.
+  - `PUT /profile/favoriteGenre/{genre_id}`: Add a genre to favorites.
+  - `PUT /profile/favoriteBook/{book_id}`: Add a book to favorites.
+
+- **Admin Features**:
+  - `DELETE /admin/delete/{user_id}`: Delete user accounts as an admin.
+  - `PUT /admin/ban/{user_id}`: Ban a user.
+
+For a detailed list of endpoints and their parameters, refer to the `openapi.yaml` file.
+
+## Technologies Used
+
+- **Backend**: Java, Spring Boot
+- **Build Tool**: Gradle
+- **Testing**: JUnit, PITest (Mutation Testing)
+- **Version Control**: Git
+- **Integration**: REST API
+
+## Design Patterns
+
+- **Proxy Pattern**: Secures sensitive user data by providing proxy objects for user information.
+- **Chain of Responsibility Pattern**: Modularizes analytics processing, ensuring scalability and extensibility.
+
+## Project Contributors
+
+This project was developed collaboratively by the following team members:
+- Maria Ruxanda Tudor
+- Ivar van Loon
+- Matei Stănescu
+- Maria Cristescu
+- Wishaal Kanhai
+
+## License
+
+This project is licensed under the TU Delft gitlab: https://gitlab.tudelft.nl
+
+## Contact
+
+For inquiries or issues, please contact mariaruxandatudor@gmail.com
